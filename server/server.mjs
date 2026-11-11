@@ -49,6 +49,8 @@ const allRequests = db.prepare(`SELECT r.id,r.owner_id,u.name AS owner_name,r.cl
 const ownRequests = db.prepare(`SELECT r.id,r.owner_id,u.name AS owner_name,r.client_name,r.vehicle_make,r.vehicle_model,r.vehicle_plate,r.status,r.created_at
   FROM repair_requests r JOIN users u ON u.id=r.owner_id WHERE r.owner_id=? ORDER BY r.created_at DESC`);
 const requestById = db.prepare(`SELECT r.*,u.name AS owner_name FROM repair_requests r JOIN users u ON u.id=r.owner_id WHERE r.id=?`);
+const updateRequestStatus = db.prepare('UPDATE repair_requests SET status=? WHERE id=?');
+const allowedStatuses = new Set(['Новая', 'В работе', 'Ожидает клиента', 'Завершена', 'Отменена']);
 
 function send(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -135,6 +137,16 @@ const server = http.createServer(async (req, res) => {
         fields.vehiclePlate, vehicleYear, fields.damageDescription, new Date().toISOString());
       return send(res, 201, { id });
     }
+    const statusMatch = /^\/api\/requests\/([a-f0-9-]+)\/status$/.exec(pathname);
+    if (req.method === 'PATCH' && statusMatch) {
+      if (user.role !== 'admin') return send(res, 403, { error: 'Статус заявки меняет только администратор' });
+      const { status } = await readJson(req);
+      if (!allowedStatuses.has(status)) return send(res, 400, { error: 'Недопустимый статус заявки' });
+      const row = requestById.get(statusMatch[1]);
+      if (!row) return send(res, 404, { error: 'Заявка не найдена' });
+      updateRequestStatus.run(status, row.id);
+      return send(res, 200, { id: row.id, status });
+    }
     const detailMatch = /^\/api\/requests\/([a-f0-9-]+)$/.exec(pathname);
     if (req.method === 'GET' && detailMatch) {
       const row = requestById.get(detailMatch[1]);
@@ -147,5 +159,5 @@ const server = http.createServer(async (req, res) => {
     return send(res, error.message === 'Неверный JSON' || error.message === 'Слишком большой запрос' ? 400 : 500, { error: error.message });
   }
 });
-const port = Number(process.env.PORT || 4173);
+const port = Number(process.env.PORT || 4174);
 server.listen(port, '127.0.0.1', () => console.log(`Локальный прототип: http://127.0.0.1:${port}`));

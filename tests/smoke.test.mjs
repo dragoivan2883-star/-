@@ -58,13 +58,18 @@ test('баннер, роли и SQLite переживают перезапуск
     assert.equal(other.body.showBanner, true);
     assert.equal((await call('/requests', { cookie: other.cookie })).body.length, 0);
     assert.equal((await call(`/requests/${id}`, { cookie: other.cookie })).status, 403);
+    assert.equal((await call(`/requests/${id}/status`, { method: 'PATCH', cookie: afterDismiss.cookie, body: { status: 'В работе' } })).status, 403);
     const admin = await login('admin-1');
     assert.equal((await call('/requests', { cookie: admin.cookie })).body.length, 1);
+    assert.equal((await call(`/requests/${id}/status`, { method: 'PATCH', cookie: admin.cookie, body: { status: 'Произвольный' } })).status, 400);
+    assert.equal((await call(`/requests/${id}/status`, { method: 'PATCH', cookie: admin.cookie, body: { status: 'В работе' } })).status, 200);
+    assert.equal((await call(`/requests/${id}`, { cookie: admin.cookie })).body.status, 'В работе');
     await stop();
     await start();
     const afterRestart = await login('agent-1');
     assert.equal(afterRestart.body.showBanner, false);
     assert.equal((await call('/requests', { cookie: afterRestart.cookie })).body.length, 1);
+    assert.equal((await call(`/requests/${id}`, { cookie: afterRestart.cookie })).body.status, 'В работе');
   } finally {
     await stop();
     rmSync(dataDir, { recursive: true, force: true });

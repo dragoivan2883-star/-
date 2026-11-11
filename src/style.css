@@ -14,3 +14,16 @@
 .banner-hitarea-action{left:6%;top:76.1%;width:47%;height:12.5%;border-radius:60px}
 .preview-button{margin-top:28px;padding:11px 17px;border:1px solid #d7d3de;border-radius:7px;background:#fff;color:#30264a;font-size:13px;font-weight:800}
 .preview-button:hover{border-color:#e4002b;color:#b81235}
+
+.modal-backdrop{animation:banner-backdrop-in .9s ease-out both}
+.banner-modal{animation:banner-slide-up .9s cubic-bezier(.2,.75,.25,1) both;will-change:transform,opacity}
+@keyframes banner-backdrop-in{from{background:transparent}to{background:#1b102dbd}}
+@keyframes banner-slide-up{from{transform:translateY(100vh);opacity:.7}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.modal-backdrop,.banner-modal{animation:none}}
+
+.status-editor{margin-top:28px;padding-top:24px;border-top:1px solid #e8e6ed}
+.status-editor label{display:block;margin-bottom:10px;font-size:13px;font-weight:800}
+.status-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.status-controls select{min-width:190px;flex:1;border:1px solid #dad7e1;background:#faf9fc;border-radius:5px;padding:12px 14px;color:#282242}
+.status-editor .primary-button{min-height:46px}
+.status-success{color:#18764c;font-size:13px;font-weight:700}

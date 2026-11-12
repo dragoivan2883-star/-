@@ -55,7 +55,7 @@ async function dismissBanner(goToForm = false) {
             <RouterLink to="/dashboard">Главная</RouterLink>
             <RouterLink to="/requests">Реестр заявок</RouterLink>
           </nav>
-          <RouterLink class="header-action" to="/requests/new">Направить на ремонт <span aria-hidden="true">↗</span></RouterLink>
+          <RouterLink class="header-action" to="/requests/new">Оставить заявку <span aria-hidden="true">↗</span></RouterLink>
           <div class="account">
             <span class="account-name">{{ state.user.name }}</span>
             <button type="button" class="text-button" @click="logout">Выйти</button>
@@ -86,7 +86,10 @@ async function dismissBanner(goToForm = false) {
       <section class="banner-modal" role="dialog" aria-modal="true" aria-label="Зарабатывайте на ремонте автомобилей">
         <img class="banner-image" src="/banner-approved.png" alt="Альтернатива: зарабатывайте на ремонте автомобилей. Направляйте клиентов в кузовные центры и получайте дополнительное вознаграждение." />
         <button ref="modalClose" class="banner-hitarea banner-hitarea-close" type="button" aria-label="Закрыть баннер" @click="dismissBanner(false)"></button>
-        <button class="banner-hitarea banner-hitarea-action" type="button" aria-label="Направить на ремонт — открыть форму заявки" @click="dismissBanner(true)"></button>
+        <button class="banner-hitarea banner-hitarea-action" type="button" aria-label="Оставить заявку — выбрать вид ремонта" @click="dismissBanner(true)">
+          <span>Оставить заявку</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="30" height="30"><path d="M4 12h15m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
       </section>
     </div>
   </div>

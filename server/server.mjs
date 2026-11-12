@@ -20,12 +20,17 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE TABLE IF NOT EXISTS repair_requests (
   id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES users(id),
-  client_name TEXT NOT NULL, client_phone TEXT NOT NULL,
+  client_name TEXT NOT NULL, client_phone TEXT NOT NULL, city TEXT NOT NULL DEFAULT '',
   vehicle_make TEXT NOT NULL, vehicle_model TEXT NOT NULL, vehicle_plate TEXT NOT NULL,
   vehicle_year INTEGER, damage_description TEXT NOT NULL,
+  repair_type TEXT NOT NULL DEFAULT 'Не указан', bonus_percent INTEGER,
   status TEXT NOT NULL DEFAULT 'Новая', created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_requests_owner ON repair_requests(owner_id, created_at);`);
+const requestColumns = new Set(db.prepare('PRAGMA table_info(repair_requests)').all().map(column => column.name));
+if (!requestColumns.has('city')) db.exec("ALTER TABLE repair_requests ADD COLUMN city TEXT NOT NULL DEFAULT ''");
+if (!requestColumns.has('repair_type')) db.exec("ALTER TABLE repair_requests ADD COLUMN repair_type TEXT NOT NULL DEFAULT 'Не указан'");
+if (!requestColumns.has('bonus_percent')) db.exec('ALTER TABLE repair_requests ADD COLUMN bonus_percent INTEGER');
 
 const demoUsers = [
   ['agent-1', 'Демо: Агент 1', 'agent'],
@@ -42,15 +47,20 @@ const deleteSession = db.prepare('DELETE FROM sessions WHERE token=?');
 const updateBanner = db.prepare('UPDATE users SET banner_closed_at=? WHERE id=?');
 const requestCount = db.prepare('SELECT count(*) AS count FROM repair_requests WHERE owner_id=?');
 const insertRequest = db.prepare(`INSERT INTO repair_requests
-  (id,owner_id,client_name,client_phone,vehicle_make,vehicle_model,vehicle_plate,vehicle_year,damage_description,status,created_at)
-  VALUES (?,?,?,?,?,?,?,?,?,'Новая',?)`);
-const allRequests = db.prepare(`SELECT r.id,r.owner_id,u.name AS owner_name,r.client_name,r.vehicle_make,r.vehicle_model,r.vehicle_plate,r.status,r.created_at
+  (id,owner_id,client_name,client_phone,city,vehicle_make,vehicle_model,vehicle_plate,vehicle_year,damage_description,repair_type,bonus_percent,status,created_at)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'Новая',?)`);
+const allRequests = db.prepare(`SELECT r.id,r.owner_id,u.name AS owner_name,r.client_name,r.city,r.vehicle_make,r.vehicle_model,r.vehicle_plate,r.repair_type,r.bonus_percent,r.status,r.created_at
   FROM repair_requests r JOIN users u ON u.id=r.owner_id ORDER BY r.created_at DESC`);
-const ownRequests = db.prepare(`SELECT r.id,r.owner_id,u.name AS owner_name,r.client_name,r.vehicle_make,r.vehicle_model,r.vehicle_plate,r.status,r.created_at
+const ownRequests = db.prepare(`SELECT r.id,r.owner_id,u.name AS owner_name,r.client_name,r.city,r.vehicle_make,r.vehicle_model,r.vehicle_plate,r.repair_type,r.bonus_percent,r.status,r.created_at
   FROM repair_requests r JOIN users u ON u.id=r.owner_id WHERE r.owner_id=? ORDER BY r.created_at DESC`);
 const requestById = db.prepare(`SELECT r.*,u.name AS owner_name FROM repair_requests r JOIN users u ON u.id=r.owner_id WHERE r.id=?`);
 const updateRequestStatus = db.prepare('UPDATE repair_requests SET status=? WHERE id=?');
 const allowedStatuses = new Set(['Новая', 'В работе', 'Ожидает клиента', 'Завершена', 'Отменена']);
+const repairTypes = new Map([
+  ['osago', { label: 'ОСАГО', percent: 1 }],
+  ['kasko', { label: 'КАСКО', percent: 2 }],
+  ['commercial', { label: 'Коммерческий ремонт', percent: 3 }]
+]);
 
 function send(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -120,7 +130,7 @@ const server = http.createServer(async (req, res) => {
       if (user.role !== 'agent') return send(res, 403, { error: 'Заявку создаёт агент' });
       const input = await readJson(req);
       const fields = {
-        clientName: clean(input.clientName, 120), clientPhone: clean(input.clientPhone, 30),
+        clientName: clean(input.clientName, 120), clientPhone: clean(input.clientPhone, 30), city: clean(input.city, 100),
         vehicleMake: clean(input.vehicleMake, 80), vehicleModel: clean(input.vehicleModel, 80),
         vehiclePlate: clean(input.vehiclePlate, 20).toUpperCase(),
         damageDescription: clean(input.damageDescription, 2000)
@@ -128,13 +138,15 @@ const server = http.createServer(async (req, res) => {
       if (Object.values(fields).some(x => !x) || !/^\+?[\d\s()\-]{10,20}$/.test(fields.clientPhone)) {
         return send(res, 400, { error: 'Заполните все обязательные поля и проверьте телефон' });
       }
+      const repairType = repairTypes.get(input.repairType);
+      if (!repairType) return send(res, 400, { error: 'Выберите вид ремонта' });
       const vehicleYear = input.vehicleYear === '' || input.vehicleYear == null ? null : Number(input.vehicleYear);
       if (vehicleYear !== null && (!Number.isInteger(vehicleYear) || vehicleYear < 1950 || vehicleYear > new Date().getFullYear() + 1)) {
         return send(res, 400, { error: 'Проверьте год выпуска' });
       }
       const id = randomUUID();
-      insertRequest.run(id, user.id, fields.clientName, fields.clientPhone, fields.vehicleMake, fields.vehicleModel,
-        fields.vehiclePlate, vehicleYear, fields.damageDescription, new Date().toISOString());
+      insertRequest.run(id, user.id, fields.clientName, fields.clientPhone, fields.city, fields.vehicleMake, fields.vehicleModel,
+        fields.vehiclePlate, vehicleYear, fields.damageDescription, repairType.label, repairType.percent, new Date().toISOString());
       return send(res, 201, { id });
     }
     const statusMatch = /^\/api\/requests\/([a-f0-9-]+)\/status$/.exec(pathname);

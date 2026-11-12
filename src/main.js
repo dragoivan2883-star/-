@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
 import Dashboard from './pages/Dashboard.vue';
 import RequestForm from './pages/RequestForm.vue';
+import RequestTypeSelect from './pages/RequestTypeSelect.vue';
 import Registry from './pages/Registry.vue';
 import RequestDetail from './pages/RequestDetail.vue';
 import './style.css';
@@ -31,7 +32,8 @@ const router = createRouter({
     { path: '/', redirect: '/dashboard' },
     { path: '/dashboard', component: Dashboard },
     { path: '/requests', component: Registry },
-    { path: '/requests/new', component: RequestForm },
+    { path: '/requests/new', component: RequestTypeSelect },
+    { path: '/requests/new/:type', component: RequestForm },
     { path: '/requests/:id', component: RequestDetail }
   ]
 });

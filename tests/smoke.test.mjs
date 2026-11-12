@@ -47,24 +47,32 @@ test('баннер, роли и SQLite переживают перезапуск
     const afterDismiss = await login('agent-1');
     assert.equal(afterDismiss.body.showBanner, false);
     const requestInput = {
-      clientName: 'Тестовый клиент', clientPhone: '+7 900 000-00-00', city: 'Казань', vehicleMake: 'Lada',
+      clientName: 'Тестовый клиент', clientPhone: '+7 900 000-00-00', city: 'Казань', insurer: 'Альфа', vehicleMake: 'Lada',
       vehicleModel: 'Vesta', vehiclePlate: 'А000АА 16', vehicleYear: 2022,
       damageDescription: 'Тестовое повреждение переднего бампера'
     };
     assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, repairType: 'other' } })).status, 400);
     assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, city: '', repairType: 'osago' } })).status, 400);
+    assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, city: 'Москва', repairType: 'osago' } })).status, 400);
+    assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, insurer: 'Зетта', repairType: 'osago' } })).status, 400);
+    assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, insurer: '', repairType: 'kasko' } })).status, 400);
+    assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, city: 'Нижнекамск', insurer: 'Ренессанс', repairType: 'kasko' } })).status, 400);
+    assert.equal((await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, repairType: 'commercial' } })).status, 400);
     const created = await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, repairType: 'osago' } });
     assert.equal(created.status, 201);
     const id = created.body.id;
     assert.equal((await call(`/requests/${id}`, { cookie: afterDismiss.cookie })).body.repair_type, 'ОСАГО');
     assert.equal((await call(`/requests/${id}`, { cookie: afterDismiss.cookie })).body.city, 'Казань');
     assert.equal((await call(`/requests/${id}`, { cookie: afterDismiss.cookie })).body.bonus_percent, 1);
-    for (const [repairType, label, percent] of [['kasko', 'КАСКО', 2], ['commercial', 'Коммерческий ремонт', 3]]) {
-      const next = await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, repairType } });
+    assert.equal((await call(`/requests/${id}`, { cookie: afterDismiss.cookie })).body.insurer, 'Альфа');
+    for (const [repairType, label, percent, city, insurer] of [['kasko', 'КАСКО', 2, 'Казань', 'Ренессанс'], ['commercial', 'Коммерческий ремонт', 3, 'Набережные Челны', '']]) {
+      const next = await call('/requests', { method: 'POST', cookie: afterDismiss.cookie, body: { ...requestInput, repairType, city, insurer } });
       assert.equal(next.status, 201);
       const detail = await call(`/requests/${next.body.id}`, { cookie: afterDismiss.cookie });
       assert.equal(detail.body.repair_type, label);
       assert.equal(detail.body.bonus_percent, percent);
+      assert.equal(detail.body.city, city);
+      assert.equal(detail.body.insurer, insurer || null);
     }
     assert.equal((await call('/requests', { cookie: afterDismiss.cookie })).body.length, 3);
     const other = await login('agent-2');
@@ -84,6 +92,7 @@ test('баннер, роли и SQLite переживают перезапуск
     assert.equal((await call('/requests', { cookie: afterRestart.cookie })).body.length, 3);
     assert.equal((await call(`/requests/${id}`, { cookie: afterRestart.cookie })).body.status, 'В работе');
     assert.equal((await call(`/requests/${id}`, { cookie: afterRestart.cookie })).body.repair_type, 'ОСАГО');
+    assert.equal((await call(`/requests/${id}`, { cookie: afterRestart.cookie })).body.insurer, 'Альфа');
   } finally {
     await stop();
     rmSync(dataDir, { recursive: true, force: true });
